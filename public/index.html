@@ -3,279 +3,372 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>EcoEdge Autonomous Agent &mdash; Factory Control</title>
+<title>EcoEdge · Industrial Control Center</title>
+<script src="https://cdn.tailwindcss.com"></script>
 <style>
-  :root {
-    --bg:        #0b0e14;
-    --panel:     #12171f;
-    --border:    #222b38;
-    --muted:     #5b6b80;
-    --text:      #d7e2ef;
-    --green:     #2ecc71;
-    --amber:     #f39c12;
-    --red:       #e74c3c;
-    --cyan:      #38bdf8;
-    --mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  body{
+    background-color:#0f172a;
+    background-image:
+      radial-gradient(1100px 520px at 82% -12%, rgba(34,211,238,.09), transparent 60%),
+      radial-gradient(880px 520px at 8% 112%, rgba(52,211,153,.06), transparent 60%),
+      linear-gradient(180deg,#0f172a 0%,#020617 100%);
+    background-attachment:fixed;
   }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    min-height: 100vh;
-    transition: background 0.4s ease;
+  .grid-overlay{
+    background-image:
+      linear-gradient(rgba(148,163,184,.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148,163,184,.055) 1px, transparent 1px);
+    background-size:42px 42px;
   }
-  body.emergency { background: linear-gradient(#3a0d0d, #0b0e14 85%); animation: alarmPulse 1s infinite; }
-  @keyframes alarmPulse { 0%,100% { background-color: rgba(231,76,60,.22); } 50% { background-color: rgba(231,76,60,.5); } }
-
-  header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 18px 28px; border-bottom: 1px solid var(--border);
-    background: rgba(18,23,31,.8); backdrop-filter: blur(6px);
-  }
-  .logo { display: flex; align-items: center; gap: 12px; }
-  .logo-dot {
-    width: 14px; height: 14px; border-radius: 50%;
-    background: var(--cyan); box-shadow: 0 0 12px var(--cyan);
-  }
-  h1 { font-size: 18px; letter-spacing: 1px; font-weight: 600; }
-  h1 span { color: var(--cyan); font-weight: 300; }
-  .live { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
-  .live i {
-    width: 9px; height: 9px; border-radius: 50%; background: var(--green);
-    animation: blink 1.4s infinite;
-  }
-  @keyframes blink { 50% { opacity: .25; } }
-
-  main { max-width: 1240px; margin: 0 auto; padding: 26px 28px 40px; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
-  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
-
-  .card {
-    background: var(--panel); border: 1px solid var(--border);
-    border-radius: 12px; padding: 20px 22px;
-    box-shadow: 0 4px 20px rgba(0,0,0,.35);
-  }
-  .card h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin-bottom: 14px; }
-
-  .sensor-row { display: flex; align-items: baseline; gap: 10px; }
-  .sensor-value { font-family: var(--mono); font-size: 44px; font-weight: 700; }
-  .sensor-unit { color: var(--muted); font-size: 15px; }
-  .sensor-meta { color: var(--muted); font-size: 13px; margin-top: 8px; font-family: var(--mono); }
-  .divider { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
-
-  .state-banner {
-    display: flex; align-items: center; justify-content: space-between; gap: 16px;
-    border-radius: 10px; padding: 14px 18px; font-weight: 600;
-    background: var(--panel); border: 1px solid var(--border);
-  }
-  .state-banner.safe  { border-color: var(--green); color: var(--green); }
-  .state-banner.crit  { border-color: var(--amber); color: var(--amber); }
-  .state-banner.shutdown { border-color: var(--red); color: var(--red); background: rgba(231,76,60,.12); }
-  #state-action { font-family: var(--mono); font-size: 18px; letter-spacing: 1px; }
-
-  .kv { display: grid; grid-template-columns: auto 1fr; gap: 8px 18px; font-size: 13px; }
-  .kv dt { color: var(--muted); }
-  .kv dd { font-family: var(--mono); color: var(--text); overflow-wrap: anywhere; }
-
-  table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 13px; }
-  th { text-align: left; color: var(--muted); font-weight: 500; padding: 6px 10px; border-bottom: 1px solid var(--border); }
-  td { padding: 8px 10px; border-bottom: 1px solid rgba(34,43,56,.5); }
-  .tag { padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: .5px; }
-  .tag.none  { background: rgba(46,204,113,.15); color: var(--green); }
-  .tag.throttle { background: rgba(243,156,18,.15); color: var(--amber); }
-  .tag.shutdown { background: rgba(231,76,60,.2);  color: var(--red); }
-
-  #alert-overlay {
-    display: none;
-    position: fixed; inset: 0; z-index: 50;
-    background: rgba(0,0,0,.55); backdrop-filter: blur(3px);
-    align-items: center; justify-content: center;
-  }
-  #alert-overlay.visible { display: flex; }
-  .alert-box {
-    background: #1a1216; border: 2px solid var(--red);
-    border-radius: 14px; padding: 34px 40px; text-align: center;
-    box-shadow: 0 0 60px rgba(231,76,60,.5);
-    max-width: 460px;
-  }
-  .alert-box h2 { color: var(--red); font-family: var(--mono); letter-spacing: 3px; font-size: 22px; margin-bottom: 10px; }
-  .alert-box p { color: var(--text); margin-bottom: 22px; font-size: 14px; }
-  .alert-box button {
-    background: var(--red); color: #fff; border: none; cursor: pointer;
-    padding: 11px 26px; border-radius: 8px; font-weight: 700; letter-spacing: 1px;
-  }
-  .alert-box button:hover { background: #ff5d4d; }
-  #alert-reason { font-family: var(--mono); color: #ff9d92; }
+  @keyframes valuePop{ 0%{ transform:scale(1.16); filter:brightness(1.35);} 100%{ transform:scale(1); filter:brightness(1);} }
+  .value-pop{ animation:valuePop .35s ease; }
+  @keyframes riseIn{ from{ opacity:0; transform:translateY(10px);} to{ opacity:1; transform:none;} }
+  .rise-in{ animation:riseIn .45s ease both; }
+  ::-webkit-scrollbar{ width:9px; height:9px; }
+  ::-webkit-scrollbar-thumb{ background:#334155; border-radius:8px; }
 </style>
 </head>
-<body id="body">
-  <header>
-    <div class="logo">
-      <div class="logo-dot"></div>
-      <h1>ECOVERGE<span>//AGENT</span></h1>
+<body class="min-h-screen bg-slate-900 font-sans text-slate-100 antialiased">
+<div class="relative z-10">
+
+<header class="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/85 backdrop-blur-md">
+  <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-4">
+    <div class="flex items-center gap-4">
+      <div class="grid h-11 w-11 place-items-center border border-cyan-400/50 bg-gradient-to-br from-cyan-400/35 to-cyan-400/5 shadow-[0_0_20px_rgba(34,211,238,.35)] [clip-path:polygon(50%_0,100%_25%,100%_75%,50%_100%,0_75%,0_25%)]">
+        <span class="h-2.5 w-2.5 rounded-full bg-cyan-300 shadow-[0_0_10px_#22d3ee,0_0_24px_#22d3ee]"></span>
+      </div>
+      <div>
+        <h1 class="font-mono text-sm font-bold tracking-[0.3em] text-slate-100">ECOVERGE<span class="text-cyan-400">//AGENT</span></h1>
+        <p class="font-mono text-[10px] tracking-[0.28em] text-slate-500">AUTONOMOUS EDGE&middot;IOT SAFETY ORCHESTRATOR</p>
+      </div>
     </div>
-    <div class="live"><i></i> LIVE ORCHESTRATION <span id="clock">--:--:--</span></div>
-  </header>
-
-  <main>
-    <div class="grid">
-      <!-- SENSOR CARD -->
-      <section class="card">
-        <h3>&#9679; LIVE TELEMETRY &mdash; <span id="sensor-machine">PNEUMATIC_PRESS_03</span></h3>
-        <div class="divider">
-          <div>
-            <div class="sensor-row">
-              <span class="sensor-value" id="temp">--</span>
-              <span class="sensor-unit">&deg;C</span>
-            </div>
-            <div class="sensor-meta">TEMPERATURE &middot; warn &ge;85 / crit &ge;95</div>
-            <canvas id="tempChart" width="520" height="120"></canvas>
-          </div>
-          <div>
-            <div class="sensor-row">
-              <span class="sensor-value" id="vib">--</span>
-              <span class="sensor-unit">mm/s</span>
-            </div>
-            <div class="sensor-meta">VIBRATION &middot; warn &ge;6 / crit &ge;10</div>
-            <canvas id="vibChart" width="520" height="120"></canvas>
-          </div>
-        </div>
-        <div class="sensor-meta" style="margin-top:14px">last sample: <span id="sensor-time">--</span></div>
-      </section>
-
-      <!-- AGENT CARD -->
-      <section class="card">
-        <h3>&#9679; AUTONOMOUS SAFETY AGENT &mdash; GEMINI 3.8 FLASH</h3>
-        <div class="state-banner safe" id="state-banner">
-          <span id="state-status">SAFE</span>
-          <span id="state-action">NONE</span>
-        </div>
-        <div class="sensor-meta" id="agent-reason" style="margin:14px 0 16px">Evaluating first reading&hellip;</div>
-        <dl class="kv">
-          <dt>Decision source</dt><dd id="agent-source">gemini</dd>
-          <dt>Model</dt><dd id="agent-model">gemini-3.8-flash</dd>
-          <dt>Inference latency</dt><dd id="agent-latency">-- ms</dd>
-          <dt>Last evaluation</dt><dd id="agent-last">--</dd>
-          <dt>Agent uptime</dt><dd id="agent-uptime">--</dd>
-        </dl>
-      </section>
-    </div>
-
-    <!-- EVENT LOG -->
-    <section class="card">
-      <h3>&#9679; COMMAND LOG</h3>
-      <table>
-        <thead><tr><th>Time</th><th>Temp &deg;C</th><th>Vib mm/s</th><th>Command</th></tr></thead>
-        <tbody id="log-body"><tr><td colspan="4" style="color:var(--muted)">collecting data&hellip;</td></tr></tbody>
-      </table>
-    </section>
-  </main>
-
-  <!-- EMERGENCY SHUTDOWN OVERLAY -->
-  <div id="alert-overlay">
-    <div class="alert-box">
-      <h2>&#9888; EMERGENCY SHUTDOWN</h2>
-      <p>Autonomous agent triggered critical intervention on <b>PNEUMATIC_PRESS_03</b>.</p>
-      <p id="alert-reason">--</p>
-      <button onclick="dismissAlert()">ACKNOWLEDGE</button>
+    <div class="flex items-center gap-4">
+      <div class="hidden items-center gap-2 font-mono text-[11px] tracking-[0.25em] text-slate-400 sm:flex">
+        <span class="h-2 w-2 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
+        LIVE&nbsp;<span id="clock" class="text-slate-200">--:--:--</span>
+      </div>
+      <div id="conn" class="flex items-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-4 py-1.5 font-mono text-[11px] font-bold tracking-widest text-emerald-400 shadow-[0_0_16px_rgba(16,185,129,.18)]">
+        <span class="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span><span id="conn-text">ONLINE</span>
+      </div>
     </div>
   </div>
+</header>
 
+<main class="mx-auto max-w-7xl px-6 pb-20 pt-8">
+  <!-- HERO / SYSTEM STATUS -->
+  <section class="rise-in relative mb-8 flex flex-wrap items-end justify-between gap-6 overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-900/70 p-6 shadow-2xl backdrop-blur-sm">
+    <div class="grid-overlay pointer-events-none absolute inset-0 opacity-60"></div>
+    <div class="relative">
+      <p class="font-mono text-[10px] tracking-[0.35em] text-cyan-400/90">PNEUMATIC PRESS UNIT 03</p>
+      <h2 class="mt-2 font-mono text-2xl font-bold tracking-[0.18em] text-slate-100">INDUSTRIAL CONTROL CENTER</h2>
+      <p class="mt-2 text-sm text-slate-400">Autonomous safety supervision &middot; Gemini 3.8 Flash &middot; telemetry refreshed every 3s</p>
+    </div>
+    <div class="relative text-right">
+      <span id="sys-badge" class="inline-flex items-center gap-2 rounded-full border border-emerald-400/70 bg-emerald-500 px-5 py-2.5 font-mono text-xs font-bold tracking-[0.18em] text-slate-950 shadow-[0_0_28px_rgba(16,185,129,.55)]">&#9679; SYSTEM SAFE</span>
+      <p id="last-eval" class="mt-2 font-mono text-[11px] tracking-widest text-slate-500">LAST EVALUATION --</p>
+    </div>
+  </section>
+<!-- METRIC CARDS -->
+  <section class="rise-in mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2" style="animation-delay:.06s">
+    <!-- TEMPERATURE -->
+    <div id="temp-card" class="relative overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-900/75 p-6 shadow-xl backdrop-blur-sm transition-all duration-500">
+      <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400/80 to-cyan-400/10"></div>
+      <div class="mb-5 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="grid h-10 w-10 place-items-center rounded-lg bg-cyan-400/10 text-xl text-cyan-300">&#9776;</div>
+          <div>
+            <p class="font-mono text-[10px] tracking-[0.3em] text-slate-500">TELEMETRY CHANNEL</p>
+            <h3 class="font-mono text-sm font-bold tracking-widest text-slate-200">TEMPERATURE</h3>
+          </div>
+        </div>
+        <span id="temp-state" class="rounded-full border border-slate-600 bg-slate-800 px-3 py-1 font-mono text-[10px] font-bold tracking-widest text-slate-400">NOMINAL</span>
+      </div>
+      <div class="flex items-end gap-3">
+        <span id="temp-value" class="font-mono text-6xl font-black leading-none text-cyan-300 drop-shadow-[0_0_18px_rgba(34,211,238,.45)] transition-all duration-500">--.-</span>
+        <span class="pb-1 font-mono text-lg text-slate-500">&deg;C</span>
+      </div>
+      <div class="mt-5 h-2 overflow-hidden rounded-full bg-slate-800">
+        <div id="temp-bar" class="h-full rounded-full bg-gradient-to-r from-cyan-400 to-cyan-200 shadow-[0_0_12px_#22d3ee] transition-all duration-500" style="width:0%"></div>
+      </div>
+      <div class="mt-3 flex items-center justify-between font-mono text-[10px] tracking-widest text-slate-500">
+        <span>THRESHOLDS: WARN &ge;85</span><span>CRIT &ge;95</span><span>MAX 110&deg;C</span>
+      </div>
+    </div>
+
+    <!-- VIBRATION -->
+    <div id="vib-card" class="relative overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-900/75 p-6 shadow-xl backdrop-blur-sm transition-all duration-500" style="animation-delay:.12s">
+      <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400/80 to-emerald-400/10"></div>
+      <div class="mb-5 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="grid h-10 w-10 place-items-center rounded-lg bg-emerald-400/10 text-xl text-emerald-300">&#10065;</div>
+          <div>
+            <p class="font-mono text-[10px] tracking-[0.3em] text-slate-500">TELEMETRY CHANNEL</p>
+            <h3 class="font-mono text-sm font-bold tracking-widest text-slate-200">VIBRATION</h3>
+          </div>
+        </div>
+        <span id="vib-state" class="rounded-full border border-slate-600 bg-slate-800 px-3 py-1 font-mono text-[10px] font-bold tracking-widest text-slate-400">NOMINAL</span>
+      </div>
+      <div class="flex items-end gap-3">
+        <span id="vib-value" class="font-mono text-6xl font-black leading-none text-emerald-300 drop-shadow-[0_0_18px_rgba(52,211,153,.45)] transition-all duration-500">--.--</span>
+        <span class="pb-1 font-mono text-lg text-slate-500">mm/s</span>
+      </div>
+      <div class="mt-5 h-2 overflow-hidden rounded-full bg-slate-800">
+        <div id="vib-bar" class="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-200 shadow-[0_0_12px_#34d399] transition-all duration-500" style="width:0%"></div>
+      </div>
+      <div class="mt-3 flex items-center justify-between font-mono text-[10px] tracking-widest text-slate-500">
+        <span>THRESHOLDS: WARN &ge;6</span><span>CRIT &ge;10</span><span>MAX 18 mm/s</span>
+      </div>
+    </div>
+  </section>
+<!-- AGENT PANEL + COMMAND LOG -->
+  <section class="rise-in mb-8 grid grid-cols-1 gap-5 lg:grid-cols-3" style="animation-delay:.14s">
+    <!-- AI AGENT -->
+    <div class="relative overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-900/75 p-6 shadow-xl backdrop-blur-sm">
+      <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-fuchsia-400/70 to-transparent"></div>
+      <div class="mb-5 flex items-center justify-between">
+        <h3 class="font-mono text-sm font-bold tracking-widest text-slate-200">&#9679; AI SAFETY AGENT</h3>
+        <span id="agent-source" class="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3 py-1 font-mono text-[10px] font-bold tracking-widest text-cyan-300">GEMINI</span>
+      </div>
+      <dl class="space-y-3 text-sm">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+          <dt class="font-mono text-[10px] tracking-[0.25em] text-slate-500">DECISION</dt>
+          <dd id="agent-decision" class="font-mono text-xs font-bold tracking-widest text-emerald-400">SAFE / NONE</dd>
+        </div>
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+          <dt class="font-mono text-[10px] tracking-[0.25em] text-slate-500">MODEL</dt>
+          <dd id="agent-model" class="font-mono text-[11px] text-slate-300">gemini-3.8-flash</dd>
+        </div>
+        <div class="border-b border-slate-800 pb-2">
+          <dt class="mb-1.5 font-mono text-[10px] tracking-[0.25em] text-slate-500">REASON</dt>
+          <dd id="agent-reason" class="font-mono text-[11px] leading-relaxed text-slate-400">Collecting telemetry&hellip;</dd>
+        </div>
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+          <dt class="font-mono text-[10px] tracking-[0.25em] text-slate-500">LATENCY</dt>
+          <dd id="agent-latency" class="font-mono text-xs text-slate-300">-- ms</dd>
+        </div>
+        <div class="flex items-center justify-between">
+          <dt class="font-mono text-[10px] tracking-[0.25em] text-slate-500">UPTIME</dt>
+          <dd id="agent-uptime" class="font-mono text-xs text-slate-300">-- s</dd>
+        </div>
+      </dl>
+    </div>
+
+    <!-- COMMAND LOG -->
+    <div class="relative overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-900/75 p-6 shadow-xl backdrop-blur-sm lg:col-span-2">
+      <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400/70 to-transparent"></div>
+      <div class="mb-4 flex items-center justify-between">
+        <h3 class="font-mono text-sm font-bold tracking-widest text-slate-200">&#9679; COMMAND LOG</h3>
+        <span class="flex items-center gap-2 font-mono text-[10px] tracking-widest text-slate-500"><span class="h-2 w-2 animate-pulse rounded-full bg-cyan-400"></span>STREAMING</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-105 border-separate border-spacing-0">
+          <thead>
+            <tr class="font-mono text-[10px] tracking-[0.25em] text-slate-500">
+              <th class="border-b border-slate-800 pb-2 text-left">TIME</th>
+              <th class="border-b border-slate-800 pb-2 text-right">TEMP &deg;C</th>
+              <th class="border-b border-slate-800 pb-2 text-right">VIB mm/s</th>
+              <th class="border-b border-slate-800 pb-2 text-center">ACTION</th>
+            </tr>
+          </thead>
+          <tbody id="log-body" class="font-mono text-xs text-slate-300">
+            <tr><td colspan="4" class="pt-4 text-slate-500">collecting data&hellip;</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="border-t border-slate-800 py-6 text-center font-mono text-[10px] tracking-[0.3em] text-slate-600">
+  ECOVERGE &middot; AUTONOMOUS EDGE-IOT SAFETY ORCHESTRATOR &middot; HACKATHON BUILD
+</footer>
+</div>
+
+<!-- EMERGENCY OVERLAY -->
+<div id="alert-overlay" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/80 p-6 backdrop-blur-sm">
+  <div class="w-full max-w-md rounded-2xl border-2 border-red-500 bg-slate-950 p-8 text-center shadow-[0_0_60px_rgba(239,68,68,.45)] [animation:popIn_.35s_ease]">
+    <p class="font-mono text-3xl">&#9888;</p>
+    <h2 class="mt-3 font-mono text-xl font-black tracking-[0.2em] text-red-500 drop-shadow-[0_0_16px_rgba(239,68,68,.9)]">EMERGENCY SHUTDOWN</h2>
+    <p class="mt-3 text-sm text-slate-300">Autonomous agent triggered critical intervention on <b class="text-red-400">PNEUMATIC_PRESS_03</b>.</p>
+    <p id="alert-reason" class="mt-3 rounded-lg border border-dashed border-red-500/50 p-3 font-mono text-xs text-red-300">--</p>
+    <button onclick="dismissAlert()" class="mt-6 w-full rounded-xl bg-gradient-to-r from-red-500 to-red-600 py-3 font-mono text-sm font-black tracking-[0.25em] text-white shadow-[0_0_24px_rgba(239,68,68,.5)] transition-transform hover:scale-[1.02]">ACKNOWLEDGE</button>
+  </div>
+</div>
 <script>
 const $ = (id) => document.getElementById(id);
-  const MAX_POINTS = 60;
-  let lastAction = "NONE";
+const ACTION = { NONE: 0, THROTTLE: 1, EMERGENCY_SHUTDOWN: 2 };
+let lastSeen = 0, connFails = 0;
 
-  async function fetchState() {
-    try {
-      const res = await fetch("/api/state");
-      const data = await res.json();
-      render(data);
-    } catch (e) {
-      $("temp").textContent = "ERR";
-      $("vib").textContent = "ERR";
-    }
+// ---- periodic clock + connectivity watchdog ----
+const ticket = () => {
+  $("clock").textContent = new Date().toLocaleTimeString("en-GB");
+  const live = (Date.now() - lastSeen) < 6000;
+  const conn = $("conn");
+  conn.classList.toggle("border-red-500/40", !live);
+  conn.classList.toggle("bg-red-500/10", !live);
+  conn.classList.toggle("border-emerald-500/40", live);
+  conn.classList.toggle("bg-emerald-500/10", live);
+  conn.querySelector("span").classList.toggle("bg-red-400", !live);
+  conn.querySelector("span").classList.toggle("bg-emerald-400", live);
+  $("conn-text").textContent = live ? "ONLINE" : "OFFLINE";
+};
+setInterval(ticket, 1000);
+
+// ---- main fetch: every call gets a fresh random reading from the serverless API ----
+async function poll() {
+  try {
+    const res = await fetch("/api/state", { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const d = await res.json();
+    lastSeen = Date.now();
+    connFails = 0;
+    paint(d);
+  } catch (err) {
+    connFails++;
+    const note = connFails > 1
+      ? " &middot; check Vercel &rarr; Settings &rarr; Environment Variables (GEMINI_API_KEY)"
+      : "";
+    $("last-eval").textContent = "BACKEND UNREACHABLE: " + err.message + note;
+    $("last-eval").classList.add("text-red-400");
+    $("last-eval").classList.remove("text-slate-500");
+  }
+}
+
+function paint(d) {
+  const s = d.sensor, a = d.agent;
+  const action = a.action || "NONE";
+  const status = a.status || "SAFE";
+  const t = Number(s.temperature), v = Number(s.vibration);
+
+  // system badge: "SYSTEM SAFE" -> pulsing red on EMERGENCY_SHUTDOWN
+  const badge = $("sys-badge");
+  const critical = action === "EMERGENCY_SHUTDOWN";
+  const warmed = action === "THROTTLE" || status === "CRITICAL";
+  badge.classList.remove("bg-red-600", "animate-pulse", "bg-amber-500", "bg-emerald-500",
+                         "border-red-400/70", "border-amber-400/70", "border-emerald-400/70",
+                         "text-slate-950");
+  if (critical) {
+    badge.classList.add("bg-red-600", "animate-pulse", "border-red-400/70");
+    badge.textContent = "\u25CF EMERGENCY SHUTDOWN";
+  } else if (warmed) {
+    badge.classList.add("bg-amber-500", "animate-pulse", "border-amber-400/70");
+    badge.textContent = "\u25CF SYSTEM WARNING";
+  } else {
+    badge.classList.add("bg-emerald-500", "border-emerald-400/70");
+    badge.textContent = "\u25CF SYSTEM SAFE";
+  }
+  $("last-eval").textContent = "LAST EVALUATION " + (a.last_eval || "--") + " &middot; " + t.toFixed(1) + "&deg;C / " + v.toFixed(2) + " mm/s";
+  $("last-eval").classList.remove("text-red-400");
+  $("last-eval").classList.add("text-slate-500");
+
+  // metric cards + threshold glow
+  const tC = $("temp-card"), vC = $("vib-card");
+  ["temp", "vib"].forEach((k) => {
+    const card = k === "temp" ? tC : vC;
+    card.classList.remove("border-cyan-400/80", "border-cyan-400/20", "border-emerald-400/80", "border-emerald-400/20",
+                          "border-amber-500/60", "border-red-500/70");
+  });
+const tStat = $("temp-state"), vStat = $("vib-state");
+  const tLevel = t >= 95 ? "crit" : t >= 85 ? "warn" : "ok";
+  const vLevel = v >= 10 ? "crit" : v >= 6 ? "warn" : "ok";
+  paintChannel("temp", tLevel, { ok: "#34d399", warn: "#f59e0b", crit: "#ef4444" });
+  paintChannel("vib", vLevel, { ok: "#22d3ee", warn: "#f59e0b", crit: "#ef4444" });
+
+  function paintChannel(k, level, badges) {
+    const isTemp = k === "temp";
+    const val = isTemp ? t : v;
+    const card = isTemp ? tC : vC;
+    const stateEl = isTemp ? tStat : vStat;
+    const max = isTemp ? 110 : 18;
+    const valEl = $(k + "-value"), barEl = $(k + "-bar"), stateBadge = $(k + "-state");
+    const base = isTemp ? "#22d3ee" : "#34d399";
+
+    valEl.textContent = isTemp ? val.toFixed(1) : val.toFixed(2);
+    valEl.classList.remove("text-cyan-300", "text-emerald-300", "text-amber-400", "text-red-500");
+    valEl.classList.add({ ok: isTemp ? "text-cyan-300" : "text-emerald-300",
+                          warn: "text-amber-400", crit: "text-red-500" }[level]);
+    valEl.style.filter = level === "crit"
+      ? "drop-shadow(0 0 22px rgba(239,68,68,.85))"
+      : level === "warn" ? "drop-shadow(0 0 18px rgba(245,158,11,.7))"
+      : "drop-shadow(0 0 18px rgba(" + (isTemp ? "34,211,238" : "52,211,153") + ",.45))";
+    valEl.classList.remove("value-pop");
+    void valEl.offsetWidth;
+    valEl.classList.add("value-pop");
+
+    const borderMap = { ok: isTemp ? "border-cyan-400/20" : "border-emerald-400/20",
+                        warn: "border-amber-500/60", crit: "border-red-500/70" };
+    const glowMap = { ok: isTemp ? "shadow-[0_0_30px_rgba(34,211,238,.18)]" : "shadow-[0_0_30px_rgba(52,211,153,.18)]",
+                      warn: "shadow-[0_0_30px_rgba(245,158,11,.3)]", crit: "shadow-[0_0_36px_rgba(239,68,68,.4)]" };
+    card.classList.add(borderMap[level], glowMap[level]);
+    const topBar = card.querySelector("div.absolute");
+    if (topBar) topBar.className = "absolute inset-x-0 top-0 h-1 bg-gradient-to-r " +
+      { ok: isTemp ? "from-cyan-400/80 to-cyan-400/10" : "from-emerald-400/80 to-emerald-400/10",
+        warn: "from-amber-400/80 to-amber-400/10", crit: "from-red-500/90 to-red-500/10" }[level];
+
+    barEl.style.width = Math.min(100, (val / max) * 100).toFixed(1) + "%";
+    barEl.classList.remove("bg-gradient-to-r", "from-cyan-400", "to-cyan-200",
+                           "from-emerald-400", "to-emerald-200", "from-amber-400", "to-amber-200",
+                           "from-red-500", "to-red-300");
+    barEl.classList.add("bg-gradient-to-r",
+      { ok: isTemp ? "from-cyan-400 to-cyan-200" : "from-emerald-400 to-emerald-200",
+        warn: "from-amber-400 to-amber-200", crit: "from-red-500 to-red-300" }[level]);
+
+    stateBadge.textContent = { ok: "NOMINAL", warn: "CAUTION", crit: "CRITICAL" }[level];
+    stateBadge.classList.remove("border-slate-600", "bg-slate-800", "text-slate-400",
+                                "border-amber-500/50", "bg-amber-500/15", "text-amber-300",
+                                "border-red-500/60", "bg-red-500/15", "text-red-400");
+    stateBadge.classList.add({ ok: "border-slate-600 bg-slate-800 text-slate-400",
+                               warn: "border-amber-500/50 bg-amber-500/15 text-amber-300",
+                               crit: "border-red-500/60 bg-red-500/15 text-red-400" }[level]);
   }
 
-  function renderChart(canvas, history) {
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (!history.length) return;
-    const w = canvas.width, h = canvas.height;
-    ctx.strokeStyle = canvas.id.startsWith("temp") ? "#38bdf8" : "#2ecc71";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    history.forEach((v, i) => {
-      const x = (i / (MAX_POINTS - 1 || 1)) * w;
-      const y = h - (v / 120) * h;
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    });
-    ctx.stroke();
+  // agent panel
+  $("agent-decision").textContent = status + " / " + action;
+  $("agent-decision").classList.toggle("text-red-500", critical);
+  $("agent-decision").classList.toggle("text-amber-400", warmed && !critical);
+  $("agent-decision").classList.toggle("text-emerald-400", !warmed);
+  $("agent-model").textContent = a.model || "gemini-3.8-flash";
+  $("agent-reason").textContent = a.reason || "NONE";
+  $("agent-latency").textContent = (a.latency_ms ?? 0) + " ms";
+  $("agent-uptime").textContent = (d.uptime_s ?? 0).toFixed(0) + " s";
+  const src = String(a.source || "gemini").toLowerCase();
+  const pill = $("agent-source");
+  pill.textContent = src === "rules" ? "RULES" : "GEMINI";
+  pill.classList.toggle("border-amber-500/50", src === "rules");
+  pill.classList.toggle("bg-amber-500/10", src === "rules");
+  pill.classList.toggle("text-amber-300", src === "rules");
+
+  // emergency overlay
+  if (critical) {
+    $("alert-reason").textContent = (a.reason || "CRITICAL THRESHOLD EXCEEDED").toUpperCase();
+    $("alert-overlay").classList.replace("hidden", "flex");
   }
 
-  const tempHist = [], vibHist = [];
-  function render(d) {
-    const s = d.sensor, a = d.agent;
+  // command log (latest entry from the API's single-item log)
+  const body = $("log-body");
+  body.innerHTML = "";
+  (Array.isArray(d.log) ? d.log : []).slice(0, 15).forEach((row) => {
+    const la = String(row.action || "NONE").toLowerCase();
+    const btnCls = la === "none"
+      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/40"
+      : la.indexOf("throttle") !== -1
+        ? "bg-amber-500/10 text-amber-300 border-amber-500/50"
+        : "bg-red-500/10 text-red-400 border-red-500/60";
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      "<td class='py-1.5 pr-3 text-slate-500'>" + (row.t || "--") + "</td>" +
+      "<td class='py-1.5 px-3 text-right'>" + Number(row.temp).toFixed(1) + "</td>" +
+      "<td class='py-1.5 px-3 text-right'>" + Number(row.vib).toFixed(2) + "</td>" +
+      "<td class='py-1.5 pl-3 text-center'><span class='inline-block rounded-full border px-2.5 py-0.5 text-[10px] font-bold tracking-wider " + btnCls + "'>" + (row.action || "NONE") + "</span></td>";
+    body.appendChild(tr);
+  });
+}
 
-    $("temp").textContent = s.temperature.toFixed(1);
-    $("vib").textContent = s.vibration.toFixed(2);
-    $("sensor-time").textContent = s.timestamp;
-    $("sensor-machine").textContent = s.machine;
+function dismissAlert() { $("alert-overlay").classList.replace("flex", "hidden"); }
 
-    tempHist.push(s.temperature); tempHist.length = Math.min(tempHist.length, MAX_POINTS);
-    vibHist.push(s.vibration); vibHist.length = Math.min(vibHist.length, MAX_POINTS);
-    renderChart($("tempChart"), tempHist);
-    renderChart($("vibChart"), vibHist);
-
-    // Agent state + banner coloring
-    $("state-status").textContent = a.status || "SAFE";
-    $("state-action").textContent = a.action || "NONE";
-    $("agent-reason").textContent = a.reason || "NONE";
-    $("agent-source").textContent = a.source || "gemini";
-    $("agent-model").textContent = a.model || "gemini-3.8-flash";
-    $("agent-latency").textContent = (a.latency_ms ?? 0) + " ms";
-    $("agent-last").textContent = a.last_eval || "--";
-    $("agent-uptime").textContent = Math.floor(d.uptime_s) + " s";
-
-    const banner = $("state-banner");
-    banner.className = "state-banner " + (a.status === "CRITICAL" ? "crit" : "safe");
-    if ((a.action || "NONE") === "EMERGENCY_SHUTDOWN") banner.className = "state-banner shutdown";
-
-    // Emergency overlay + red screen flash
-    if ((a.action || "NONE") === "EMERGENCY_SHUTDOWN" && lastAction !== "EMERGENCY_SHUTDOWN") {
-      $("body").classList.add("emergency");
-      $("alert-reason").textContent = (a.reason || "CRITICAL THRESHOLD EXCEEDED").toUpperCase();
-      $("alert-overlay").classList.add("visible");
-    }
-    if ((a.action || "NONE") !== "EMERGENCY_SHUTDOWN") {
-      $("body").classList.remove("emergency");
-    }
-    lastAction = a.action || "NONE";
-
-    // Event log
-    const tb = $("log-body");
-    tb.innerHTML = "";
-    (d.log || []).forEach(row => {
-      const tr = document.createElement("tr");
-      const cls = String(row.action).toLowerCase().indexOf("throttle") !== -1 ? "throttle"
-               : String(row.action).toLowerCase() === "none" ? "none" : "shutdown";
-      tr.innerHTML =
-        "<td>" + row.t + "</td>" +
-        "<td>" + row.temp.toFixed(1) + "</td>" +
-        "<td>" + row.vib.toFixed(2) + "</td>" +
-        "<td><span class='tag " + cls + "'>" + row.action + "</span></td>";
-      tb.appendChild(tr);
-    });
-
-    $("clock").textContent = new Date().toLocaleTimeString("en-GB");
-  }
-
-  function dismissAlert() { $("alert-overlay").classList.remove("visible"); }
-
-  // Poll every 2 seconds
-  setInterval(fetchState, 2000);
-  fetchState();
+// ---- poll every 3 seconds ----
+poll();
+setInterval(poll, 3000);
 </script>
 </body>
 </html>
