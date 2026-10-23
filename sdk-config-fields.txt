@@ -1,0 +1,13 @@
+﻿python : Traceback (most recent call last):
+At line:1 char:1
++ python -c "from google.genai import types; print([f.name for f in typ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call l 
+   ast)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "<string>", line 1, in <module>
+    from google.genai import types; print([f.name for f in 
+types.GenerateContentConfig.model_fields])
+                                           ^^^^^^
+AttributeError: 'str' object has no attribute 'name'

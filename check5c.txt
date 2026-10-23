@@ -1,0 +1,1 @@
+﻿NOW: source=gemini action=NONE reason=Waiting for first AI evaluation... up=0.0

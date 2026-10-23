@@ -1,0 +1,5 @@
+﻿client: Client
+has models.generate_content: True
+has interactions: True
+has interactions.create: True
+HttpOptions: <class 'google.genai.types.HttpOptions'>

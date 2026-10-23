@@ -1,0 +1,14 @@
+C:\Projects Engineering\PromptWars NMIET\app.py:26: FutureWarning: 
+
+All support for the `google.generativeai` package has ended. It will no longer be receiving 
+updates or bug fixes. Please switch to the `google.genai` package as soon as possible.
+See README for more details:
+
+https://github.com/google-gemini/deprecated-generative-ai-python/blob/main/README.md
+
+  import google.generativeai as genai
+INFO:     Started server process [21088]
+INFO:     Waiting for application startup.
+2026-10-23 12:48:59,138 INFO EcoEdge agent online. Dashboard: http://127.0.0.1:8000
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)

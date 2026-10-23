@@ -1,0 +1,2 @@
+﻿timeout docs:
+['timeout: Optional[int] = Field(', 'default=None, description="""Timeout for the request in milliseconds."""']

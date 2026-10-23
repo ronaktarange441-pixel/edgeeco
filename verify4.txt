@@ -1,0 +1,9 @@
+﻿POLL1: source=gemini action=NONE reason=Waiting for first AI evaluation...
+POLL2: source=gemini action=NONE reason=Waiting for first AI evaluation... lat=0ms temp=68.0
+POLL3: source=gemini action=NONE reason=Waiting for first AI evaluation...
+  import google.generativeai as genai
+INFO:     Started server process [4764]
+INFO:     Waiting for application startup.
+2026-10-23 12:53:11,176 INFO EcoEdge agent online. Dashboard: http://127.0.0.1:8000
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)

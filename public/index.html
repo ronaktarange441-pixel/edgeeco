@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EcoEdge Autonomous Agent &mdash; Factory Control</title>
+<style>
+  :root {
+    --bg:        #0b0e14;
+    --panel:     #12171f;
+    --border:    #222b38;
+    --muted:     #5b6b80;
+    --text:      #d7e2ef;
+    --green:     #2ecc71;
+    --amber:     #f39c12;
+    --red:       #e74c3c;
+    --cyan:      #38bdf8;
+    --mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    transition: background 0.4s ease;
+  }
+  body.emergency { background: linear-gradient(#3a0d0d, #0b0e14 85%); animation: alarmPulse 1s infinite; }
+  @keyframes alarmPulse { 0%,100% { background-color: rgba(231,76,60,.22); } 50% { background-color: rgba(231,76,60,.5); } }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 28px; border-bottom: 1px solid var(--border);
+    background: rgba(18,23,31,.8); backdrop-filter: blur(6px);
+  }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-dot {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--cyan); box-shadow: 0 0 12px var(--cyan);
+  }
+  h1 { font-size: 18px; letter-spacing: 1px; font-weight: 600; }
+  h1 span { color: var(--cyan); font-weight: 300; }
+  .live { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+  .live i {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--green);
+    animation: blink 1.4s infinite;
+  }
+  @keyframes blink { 50% { opacity: .25; } }
+
+  main { max-width: 1240px; margin: 0 auto; padding: 26px 28px 40px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.35);
+  }
+  .card h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin-bottom: 14px; }
+
+  .sensor-row { display: flex; align-items: baseline; gap: 10px; }
+  .sensor-value { font-family: var(--mono); font-size: 44px; font-weight: 700; }
+  .sensor-unit { color: var(--muted); font-size: 15px; }
+  .sensor-meta { color: var(--muted); font-size: 13px; margin-top: 8px; font-family: var(--mono); }
+  .divider { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+  .state-banner {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    border-radius: 10px; padding: 14px 18px; font-weight: 600;
+    background: var(--panel); border: 1px solid var(--border);
+  }
+  .state-banner.safe  { border-color: var(--green); color: var(--green); }
+  .state-banner.crit  { border-color: var(--amber); color: var(--amber); }
+  .state-banner.shutdown { border-color: var(--red); color: var(--red); background: rgba(231,76,60,.12); }
+  #state-action { font-family: var(--mono); font-size: 18px; letter-spacing: 1px; }
+
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 8px 18px; font-size: 13px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { font-family: var(--mono); color: var(--text); overflow-wrap: anywhere; }
+
+  table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+  td { padding: 8px 10px; border-bottom: 1px solid rgba(34,43,56,.5); }
+  .tag { padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: .5px; }
+  .tag.none  { background: rgba(46,204,113,.15); color: var(--green); }
+  .tag.throttle { background: rgba(243,156,18,.15); color: var(--amber); }
+  .tag.shutdown { background: rgba(231,76,60,.2);  color: var(--red); }
+
+  #alert-overlay {
+    display: none;
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(0,0,0,.55); backdrop-filter: blur(3px);
+    align-items: center; justify-content: center;
+  }
+  #alert-overlay.visible { display: flex; }
+  .alert-box {
+    background: #1a1216; border: 2px solid var(--red);
+    border-radius: 14px; padding: 34px 40px; text-align: center;
+    box-shadow: 0 0 60px rgba(231,76,60,.5);
+    max-width: 460px;
+  }
+  .alert-box h2 { color: var(--red); font-family: var(--mono); letter-spacing: 3px; font-size: 22px; margin-bottom: 10px; }
+  .alert-box p { color: var(--text); margin-bottom: 22px; font-size: 14px; }
+  .alert-box button {
+    background: var(--red); color: #fff; border: none; cursor: pointer;
+    padding: 11px 26px; border-radius: 8px; font-weight: 700; letter-spacing: 1px;
+  }
+  .alert-box button:hover { background: #ff5d4d; }
+  #alert-reason { font-family: var(--mono); color: #ff9d92; }
+</style>
+</head>
+<body id="body">
+  <header>
+    <div class="logo">
+      <div class="logo-dot"></div>
+      <h1>ECOVERGE<span>//AGENT</span></h1>
+    </div>
+    <div class="live"><i></i> LIVE ORCHESTRATION <span id="clock">--:--:--</span></div>
+  </header>
+
+  <main>
+    <div class="grid">
+      <!-- SENSOR CARD -->
+      <section class="card">
+        <h3>&#9679; LIVE TELEMETRY &mdash; <span id="sensor-machine">PNEUMATIC_PRESS_03</span></h3>
+        <div class="divider">
+          <div>
+            <div class="sensor-row">
+              <span class="sensor-value" id="temp">--</span>
+              <span class="sensor-unit">&deg;C</span>
+            </div>
+            <div class="sensor-meta">TEMPERATURE &middot; warn &ge;85 / crit &ge;95</div>
+            <canvas id="tempChart" width="520" height="120"></canvas>
+          </div>
+          <div>
+            <div class="sensor-row">
+              <span class="sensor-value" id="vib">--</span>
+              <span class="sensor-unit">mm/s</span>
+            </div>
+            <div class="sensor-meta">VIBRATION &middot; warn &ge;6 / crit &ge;10</div>
+            <canvas id="vibChart" width="520" height="120"></canvas>
+          </div>
+        </div>
+        <div class="sensor-meta" style="margin-top:14px">last sample: <span id="sensor-time">--</span></div>
+      </section>
+
+      <!-- AGENT CARD -->
+      <section class="card">
+        <h3>&#9679; AUTONOMOUS SAFETY AGENT &mdash; GEMINI 3.8 FLASH</h3>
+        <div class="state-banner safe" id="state-banner">
+          <span id="state-status">SAFE</span>
+          <span id="state-action">NONE</span>
+        </div>
+        <div class="sensor-meta" id="agent-reason" style="margin:14px 0 16px">Evaluating first reading&hellip;</div>
+        <dl class="kv">
+          <dt>Decision source</dt><dd id="agent-source">gemini</dd>
+          <dt>Model</dt><dd id="agent-model">gemini-3.8-flash</dd>
+          <dt>Inference latency</dt><dd id="agent-latency">-- ms</dd>
+          <dt>Last evaluation</dt><dd id="agent-last">--</dd>
+          <dt>Agent uptime</dt><dd id="agent-uptime">--</dd>
+        </dl>
+      </section>
+    </div>
+
+    <!-- EVENT LOG -->
+    <section class="card">
+      <h3>&#9679; COMMAND LOG</h3>
+      <table>
+        <thead><tr><th>Time</th><th>Temp &deg;C</th><th>Vib mm/s</th><th>Command</th></tr></thead>
+        <tbody id="log-body"><tr><td colspan="4" style="color:var(--muted)">collecting data&hellip;</td></tr></tbody>
+      </table>
+    </section>
+  </main>
+
+  <!-- EMERGENCY SHUTDOWN OVERLAY -->
+  <div id="alert-overlay">
+    <div class="alert-box">
+      <h2>&#9888; EMERGENCY SHUTDOWN</h2>
+      <p>Autonomous agent triggered critical intervention on <b>PNEUMATIC_PRESS_03</b>.</p>
+      <p id="alert-reason">--</p>
+      <button onclick="dismissAlert()">ACKNOWLEDGE</button>
+    </div>
+  </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+  const MAX_POINTS = 60;
+  let lastAction = "NONE";
+
+  async function fetchState() {
+    try {
+      const res = await fetch("/api/state");
+      const data = await res.json();
+      render(data);
+    } catch (e) {
+      $("temp").textContent = "ERR";
+      $("vib").textContent = "ERR";
+    }
+  }
+
+  function renderChart(canvas, history) {
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!history.length) return;
+    const w = canvas.width, h = canvas.height;
+    ctx.strokeStyle = canvas.id.startsWith("temp") ? "#38bdf8" : "#2ecc71";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    history.forEach((v, i) => {
+      const x = (i / (MAX_POINTS - 1 || 1)) * w;
+      const y = h - (v / 120) * h;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  }
+
+  const tempHist = [], vibHist = [];
+  function render(d) {
+    const s = d.sensor, a = d.agent;
+
+    $("temp").textContent = s.temperature.toFixed(1);
+    $("vib").textContent = s.vibration.toFixed(2);
+    $("sensor-time").textContent = s.timestamp;
+    $("sensor-machine").textContent = s.machine;
+
+    tempHist.push(s.temperature); tempHist.length = Math.min(tempHist.length, MAX_POINTS);
+    vibHist.push(s.vibration); vibHist.length = Math.min(vibHist.length, MAX_POINTS);
+    renderChart($("tempChart"), tempHist);
+    renderChart($("vibChart"), vibHist);
+
+    // Agent state + banner coloring
+    $("state-status").textContent = a.status || "SAFE";
+    $("state-action").textContent = a.action || "NONE";
+    $("agent-reason").textContent = a.reason || "NONE";
+    $("agent-source").textContent = a.source || "gemini";
+    $("agent-model").textContent = a.model || "gemini-3.8-flash";
+    $("agent-latency").textContent = (a.latency_ms ?? 0) + " ms";
+    $("agent-last").textContent = a.last_eval || "--";
+    $("agent-uptime").textContent = Math.floor(d.uptime_s) + " s";
+
+    const banner = $("state-banner");
+    banner.className = "state-banner " + (a.status === "CRITICAL" ? "crit" : "safe");
+    if ((a.action || "NONE") === "EMERGENCY_SHUTDOWN") banner.className = "state-banner shutdown";
+
+    // Emergency overlay + red screen flash
+    if ((a.action || "NONE") === "EMERGENCY_SHUTDOWN" && lastAction !== "EMERGENCY_SHUTDOWN") {
+      $("body").classList.add("emergency");
+      $("alert-reason").textContent = (a.reason || "CRITICAL THRESHOLD EXCEEDED").toUpperCase();
+      $("alert-overlay").classList.add("visible");
+    }
+    if ((a.action || "NONE") !== "EMERGENCY_SHUTDOWN") {
+      $("body").classList.remove("emergency");
+    }
+    lastAction = a.action || "NONE";
+
+    // Event log
+    const tb = $("log-body");
+    tb.innerHTML = "";
+    (d.log || []).forEach(row => {
+      const tr = document.createElement("tr");
+      const cls = String(row.action).toLowerCase().indexOf("throttle") !== -1 ? "throttle"
+               : String(row.action).toLowerCase() === "none" ? "none" : "shutdown";
+      tr.innerHTML =
+        "<td>" + row.t + "</td>" +
+        "<td>" + row.temp.toFixed(1) + "</td>" +
+        "<td>" + row.vib.toFixed(2) + "</td>" +
+        "<td><span class='tag " + cls + "'>" + row.action + "</span></td>";
+      tb.appendChild(tr);
+    });
+
+    $("clock").textContent = new Date().toLocaleTimeString("en-GB");
+  }
+
+  function dismissAlert() { $("alert-overlay").classList.remove("visible"); }
+
+  // Poll every 2 seconds
+  setInterval(fetchState, 2000);
+  fetchState();
+</script>
+</body>
+</html>

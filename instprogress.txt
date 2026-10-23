@@ -1,0 +1,10 @@
+﻿Requirement already satisfied: typing-inspection>=0.4.4 in C:\Users\USER\AppData\Local\Programs\Python\Python314\Lib\site-packages (from pydantic<3.0.0,>=2.12.5->google-genai) (0.4.4)
+Requirement already satisfied: charset_normalizer<4,>=2 in C:\Users\USER\AppData\Local\Programs\Python\Python314\Lib\site-packages (from requests<3.0.0,>=2.28.1->google-genai) (3.5.2)
+Requirement already satisfied: urllib3<3,>=1.26 in C:\Users\USER\AppData\Local\Programs\Python\Python314\Lib\site-packages (from requests<3.0.0,>=2.28.1->google-genai) (2.8.0)
+Requirement already satisfied: cffi>=2.0.0 in C:\Users\USER\AppData\Local\Programs\Python\Python314\Lib\site-packages (from cryptography>=41.0.5->google-auth<3.0.0,>=2.56.0->google-auth[requests]<3.0.0,>=2.56.0->google-genai) (2.1.1)
+Requirement already satisfied: pycparser in C:\Users\USER\AppData\Local\Programs\Python\Python314\Lib\site-packages (from cffi>=2.0.0->cryptography>=41.0.5->google-auth<3.0.0,>=2.56.0->google-auth[requests]<3.0.0,>=2.56.0->google-genai) (3.12)
+Requirement already satisfied: pyasn1<0.7.0,>=0.6.1 in C:\Users\USER\AppData\Local\Programs\Python\Python314\Lib\site-packages (from pyasn1-modules>=0.2.1->google-auth<3.0.0,>=2.56.0->google-auth[requests]<3.0.0,>=2.56.0->google-genai) (0.6.4)
+Downloading google_genai-2.33.0-py3-none-any.whl (1.2 MB)
+   ---------------------------------------- 1.2/1.2 MB 243.4 kB/s  0:00:05
+Downloading distro-1.9.0-py3-none-any.whl (20 kB)
+Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
