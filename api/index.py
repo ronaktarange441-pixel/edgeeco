@@ -18,31 +18,39 @@ Security: GEMINI_API_KEY is read server-side from Vercel env vars and is
 never exposed in any API response or static asset.
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import os
 import random
 import time
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-log = logging.getLogger("ecoedge")
+# ---------------------------------------------------------------------------
+# Logging configuration
+# ---------------------------------------------------------------------------
+log: logging.Logger = logging.getLogger("ecoedge")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-# --------------------------------------------------------------------------
-# Config & secrets
-# --------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Config & secrets - read from the environment. A missing GEMINI_API_KEY must
+# never crash the app; the rule engine keeps the dashboard alive.
+# ---------------------------------------------------------------------------
 load_dotenv()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 
-PUBLIC_DIR = Path(__file__).resolve().parent.parent / "public"
-MACHINE = "PNEUMATIC_PRESS_03"
-START_TIME = time.time()
+PUBLIC_DIR: Path = Path(__file__).resolve().parent.parent / "public"
+MACHINE: str = "PNEUMATIC_PRESS_03"
+START_TIME: float = time.time()
 
-SYSTEM_PROMPT = (
+SYSTEM_PROMPT: str = (
     "You are an Industrial Safety Agent for a smart factory edge controller.\n"
     "You receive live IoT sensor telemetry from one machine. Analyse the reading and decide\n"
     "the machine's safety state and the action to take.\n\n"
@@ -64,8 +72,10 @@ SYSTEM_PROMPT = (
 # Gemini client - built ONLY when the key exists. A missing key must never
 # crash the app; the rule engine below keeps the dashboard alive.
 # --------------------------------------------------------------------------
-CLIENT = None
-GEMINI_MODEL = "gemini-3.8-flash"
+# A `google.genai.Client` instance when the SDK and a key are available and
+# the import succeeded at startup; None means rule-engine-only mode.
+CLIENT: Any = None
+GEMINI_MODEL: str = "gemini-3.8-flash"
 
 if GEMINI_API_KEY:
     try:
@@ -86,7 +96,23 @@ else:
 # Deterministic rule engine: same thresholds as the Gemini system prompt.
 # Guarantees a decision on every request, no network required.
 # --------------------------------------------------------------------------
-def rule_fallback(temp: float, vib: float):
+def rule_fallback(temp: float, vib: float) -> tuple[str, str]:
+    """Decide the safety state with a deterministic rule engine.
+
+    The thresholds mirror the Gemini system prompt so the AI and the
+    fallback paths always agree with each other:
+
+        - temp >= 95 or vib >= 10  -> CRITICAL / EMERGENCY_SHUTDOWN
+        - temp >= 85 or vib >= 6   -> CRITICAL / THROTTLE
+        - otherwise                -> SAFE / NONE
+
+    Args:
+        temp: machine temperature in degrees Celsius.
+        vib: machine vibration in mm/s.
+
+    Returns:
+        A ``(status, action)`` tuple, e.g. ``("SAFE", "NONE")``.
+    """
     if temp >= 95.0 or vib >= 10.0:
         return "CRITICAL", "EMERGENCY_SHUTDOWN"
     if temp >= 85.0 or vib >= 6.0:
@@ -94,21 +120,34 @@ def rule_fallback(temp: float, vib: float):
     return "SAFE", "NONE"
 
 
-def ask_gemini(payload: dict) -> dict:
-    """Ask Gemini for a decision. On ANY failure (no key, timeout, network,
-    malformed reply) fall back to the rule engine so every request succeeds."""
-    prompt = (
+def ask_gemini(payload: dict[str, object]) -> dict[str, object]:
+    """Ask the Gemini agent for a decision about one sensor reading.
+
+    On ANY failure - missing key, timeout, network error, malformed or
+    unexpected reply - the evaluation degrades to the deterministic rule
+    engine, so this function never raises and every request still succeeds.
+
+    Args:
+        payload: Dictionary with ``machine``, ``temperature`` and
+            ``vibration`` keys describing the current sensor reading.
+
+    Returns:
+        A decision dictionary with ``status``, ``action`` and ``reason``
+        plus the metadata keys ``latency_ms``, ``source`` (``"gemini"`` or
+        ``"rules"``) and ``model``.
+    """
+    prompt: str = (
         f"Machine: {payload['machine']}\n"
         f"Temperature: {payload['temperature']} degC\n"
         f"Vibration: {payload['vibration']} mm/s\n"
         "Respond with JSON only."
     )
-    started = time.time()
-    source = "gemini"
+    started: float = time.time()
+    source: str = "gemini"
     try:
         if CLIENT is None:
             raise RuntimeError("GEMINI_API_KEY missing")
-        response = CLIENT.models.generate_content(
+        response: Any = CLIENT.models.generate_content(
             model=GEMINI_MODEL,
             contents=prompt,
             config=types.GenerateContentConfig(
@@ -117,10 +156,10 @@ def ask_gemini(payload: dict) -> dict:
                 response_mime_type="application/json",
             ),
         )
-        raw = (response.text or "").strip()
+        raw: str = (response.text or "").strip()
         raw = raw.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-        parsed = json.loads(raw)
-        decision = {
+        parsed: dict[str, object] = json.loads(raw)
+        decision: dict[str, object] = {
             "status": str(parsed.get("status", "")).upper(),
             "action": str(parsed.get("action", "")).upper(),
             "reason": str(parsed.get("reason", "") or "NONE"),
@@ -129,6 +168,8 @@ def ask_gemini(payload: dict) -> dict:
             raise ValueError("unknown action")
     except Exception as exc:  # noqa: BLE001 - any failure degrades to rules
         log.warning("Gemini evaluation failed (%s) - using rule engine", repr(exc))
+        status: str
+        action: str
         status, action = rule_fallback(payload["temperature"], payload["vibration"])
         decision = {
             "status": status,
@@ -143,61 +184,96 @@ def ask_gemini(payload: dict) -> dict:
 # --------------------------------------------------------------------------
 # FastAPI app - no background loops, no startup thread, fully serverless
 # --------------------------------------------------------------------------
-app = FastAPI(title="EcoEdge Autonomous Agent (Serverless)")
+app: FastAPI = FastAPI(title="EcoEdge Autonomous Agent (Serverless)")
 
 
 @app.get("/api/health")
-def api_health() -> dict:
-    """Quick liveness probe (handy for debugging the Vercel deployment)."""
-    return {
-        "ok": True,
-        "gemini_key_set": bool(GEMINI_API_KEY),
-        "machine": MACHINE,
-        "uptime_s": round(time.time() - START_TIME, 1),
-    }
+def api_health() -> dict[str, object]:
+    """Return a lightweight liveness probe for the deployment.
+
+    Handy while debugging the Vercel deployment: confirms the service is
+    responding, whether a Gemini API key is configured, the monitored
+    machine name and how long this process has been up.
+
+    Returns:
+        A dictionary with ``ok``, ``gemini_key_set``, ``machine`` and
+        ``uptime_s`` keys. On an unexpected failure a structured 500 JSON
+        response is returned instead so the probe never crashes silently.
+    """
+    try:
+        return {
+            "ok": True,
+            "gemini_key_set": bool(GEMINI_API_KEY),
+            "machine": MACHINE,
+            "uptime_s": round(time.time() - START_TIME, 1),
+        }
+    except Exception as exc:  # noqa: BLE001 - the probe must never 500 silently
+        log.exception("Unexpected error in /api/health: %s", repr(exc))
+        return JSONResponse(
+            status_code=500,
+            content={"ok": False, "error": "internal_error", "detail": str(exc)},
+        )
 
 
 @app.get("/api/state")
-def api_state() -> dict:
-    """One request = one fresh mock reading + one AI decision.
-    Fully regenerated per call - no persistent state required."""
-    temperature = round(random.uniform(70.0, 110.0), 1)
-    vibration = round(random.uniform(2.0, 18.0), 2)
-    now = time.strftime("%H:%M:%S")
+def api_state() -> dict[str, object]:
+    """Generate a fresh mock reading and an AI decision per request.
 
-    payload = {
-        "machine": MACHINE,
-        "temperature": temperature,
-        "vibration": vibration,
-    }
-    decision = ask_gemini(payload)
+    Each call produces a new random sensor reading, evaluates it with the
+    Gemini agent (falling back to the deterministic rule engine when the AI
+    is unavailable) and returns the complete telemetry + decision payload.
+    The endpoint is fully stateless so it runs correctly on serverless
+    infrastructure. Any unexpected error is caught and converted into a
+    structured 500 response instead of crashing the worker.
 
-    return {
-        "sensor": {
+    Returns:
+        A dictionary with the ``sensor`` reading, the ``agent`` decision, a
+        one-entry ``log`` list and the process ``uptime_s``.
+    """
+    try:
+        temperature: float = round(random.uniform(70.0, 110.0), 1)
+        vibration: float = round(random.uniform(2.0, 18.0), 2)
+        now: str = time.strftime("%H:%M:%S")
+
+        payload: dict[str, object] = {
             "machine": MACHINE,
             "temperature": temperature,
             "vibration": vibration,
-            "timestamp": now,
-        },
-        "agent": {
-            "status": decision.get("status", "SAFE"),
-            "action": decision.get("action", "NONE"),
-            "reason": decision.get("reason") or "NONE",
-            "source": decision.get("source", "rules"),
-            "latency_ms": decision.get("latency_ms", 0),
-            "last_eval": now,
-            "model": decision.get("model", GEMINI_MODEL),
-        },
-        "log": [
-            {
-                "t": now,
-                "temp": temperature,
-                "vib": vibration,
+        }
+        decision: dict[str, object] = ask_gemini(payload)
+
+        return {
+            "sensor": {
+                "machine": MACHINE,
+                "temperature": temperature,
+                "vibration": vibration,
+                "timestamp": now,
+            },
+            "agent": {
+                "status": decision.get("status", "SAFE"),
                 "action": decision.get("action", "NONE"),
-            }
-        ],
-        "uptime_s": round(time.time() - START_TIME, 1),
-    }
+                "reason": decision.get("reason") or "NONE",
+                "source": decision.get("source", "rules"),
+                "latency_ms": decision.get("latency_ms", 0),
+                "last_eval": now,
+                "model": decision.get("model", GEMINI_MODEL),
+            },
+            "log": [
+                {
+                    "t": now,
+                    "temp": temperature,
+                    "vib": vibration,
+                    "action": decision.get("action", "NONE"),
+                }
+            ],
+            "uptime_s": round(time.time() - START_TIME, 1),
+        }
+    except Exception as exc:  # noqa: BLE001 - keep the endpoint alive
+        log.exception("Unexpected error in /api/state: %s", repr(exc))
+        return JSONResponse(
+            status_code=500,
+            content={"ok": False, "error": "internal_error", "detail": str(exc)},
+        )
 
 
 # Serve the dashboard for local runs (Vercel serves /public via rewrites).
